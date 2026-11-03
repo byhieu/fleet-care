@@ -1,0 +1,12 @@
+out/
+target/
+save.dat
+highscores.txt
+*.class
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+nbproject/
