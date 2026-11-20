@@ -5,6 +5,8 @@ import com.cartycoon.model.GameState;
 import com.cartycoon.util.Format;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -18,27 +20,34 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.RenderingHints;
 
-/** The card-based popup after "Ngày tiếp theo": metrics cards, categorized events, dark navy & gold. */
+/**
+ * Hộp thoại tổng kết ngày theo phong cách GitHub Dark.
+ * Hàng trên 3 ô thống kê (Thu màu OK, Chi màu BAD, Tiền hiện có),
+ * bên dưới danh sách sự kiện với icon chấm tròn màu theo từng loại sự kiện.
+ */
 public final class DaySummaryDialog {
 
     private DaySummaryDialog() {
     }
 
     public static void show(Component parent, DayReport report, GameState state) {
-        JFrame owner = (JFrame) SwingUtilities.getWindowAncestor(parent);
+        JFrame owner = parent instanceof JFrame f ? f : (JFrame) SwingUtilities.getWindowAncestor(parent);
         JDialog dialog = new JDialog(owner, "Tổng kết ngày " + report.day(), true);
-        dialog.getContentPane().setBackground(UiUtil.NAVY_BG);
+        dialog.getContentPane().setBackground(UiUtil.COLOR_BG);
 
-        // Header Title
-        JLabel title = new JLabel("🌅 TỔNG KẾT NGÀY " + report.day(), SwingConstants.CENTER);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 22f));
-        title.setForeground(UiUtil.GOLD);
+        // Header Tiêu đề
+        JLabel title = new JLabel("TỔNG KẾT NGÀY " + report.day(), SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setForeground(UiUtil.COLOR_TEXT);
 
         JLabel subtitle = new JLabel(report.gameOver() ? "Trận đấu đã khép lại!" : "Chuẩn bị đón khách và vận hành bãi xe ngày tiếp theo", SwingConstants.CENTER);
-        subtitle.setFont(subtitle.getFont().deriveFont(13f));
-        subtitle.setForeground(UiUtil.TEXT_MUTED);
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitle.setForeground(UiUtil.COLOR_MUTED);
 
         JPanel header = new JPanel(new GridLayout(2, 1, 4, 4));
         header.setOpaque(false);
@@ -46,42 +55,38 @@ public final class DaySummaryDialog {
         header.add(title);
         header.add(subtitle);
 
-        // 4 Summary Metric Cards (Income, Costs, Cash, Reputation)
-        JPanel metricsPanel = new JPanel(new GridLayout(1, 4, 10, 10));
+        // Hàng trên: đúng 3 ô thống kê (Thu trong ngày, Chi trong ngày, Tiền hiện có)
+        JPanel metricsPanel = new JPanel(new GridLayout(1, 3, 12, 12));
         metricsPanel.setOpaque(false);
 
-        metricsPanel.add(createMetricCard("💰 Thu trong ngày",
+        metricsPanel.add(createMetricCard("THU TRONG NGÀY",
                 "+" + Format.money(report.income()),
-                new Color(20, 60, 36), new Color(34, 197, 94), new Color(110, 231, 145)));
+                UiUtil.COLOR_OK));
 
-        metricsPanel.add(createMetricCard("💸 Chi trong ngày",
+        metricsPanel.add(createMetricCard("CHI TRONG NGÀY",
                 (report.costs() > 0 ? "-" : "") + Format.money(report.costs()),
-                new Color(77, 22, 22), new Color(239, 68, 68), new Color(252, 165, 165)));
+                UiUtil.COLOR_BAD));
 
-        metricsPanel.add(createMetricCard("🏦 Tiền mặt hiện có",
+        metricsPanel.add(createMetricCard("TIỀN HIỆN CÓ",
                 Format.money(state.getMoney()),
-                new Color(69, 45, 12), UiUtil.GOLD, UiUtil.TEXT_GOLD));
+                UiUtil.COLOR_TEXT));
 
-        metricsPanel.add(createMetricCard("⭐ Uy tín cửa hàng",
-                UiUtil.stars(state.getStars()) + " (" + state.getReputation() + ")",
-                new Color(24, 49, 89), new Color(96, 165, 250), new Color(147, 197, 253)));
-
-        // Details Activity List Card
-        JPanel activityCard = UiUtil.card(UiUtil.NAVY_CARD, UiUtil.NAVY_BORDER);
+        // Khung chi tiết sự kiện
+        JPanel activityCard = UiUtil.card(UiUtil.COLOR_PANEL, UiUtil.COLOR_LINE);
         activityCard.setLayout(new BorderLayout(8, 8));
-        activityCard.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
+        activityCard.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
 
-        JLabel actTitle = new JLabel("📋 Chi tiết các diễn biến trong ngày:");
-        actTitle.setFont(actTitle.getFont().deriveFont(Font.BOLD, 14f));
-        actTitle.setForeground(UiUtil.GOLD);
+        JLabel actTitle = new JLabel("CHI TIẾT CÁC DIỄN BIẾN TRONG NGÀY");
+        actTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        actTitle.setForeground(UiUtil.COLOR_MUTED);
         activityCard.add(actTitle, BorderLayout.NORTH);
 
-        JPanel linesPanel = new JPanel(new GridLayout(0, 1, 4, 4));
+        JPanel linesPanel = new JPanel(new GridLayout(0, 1, 6, 6));
         linesPanel.setOpaque(false);
 
         if (report.lines().isEmpty()) {
-            JLabel empty = new JLabel("Một ngày yên bình trôi qua, không có biến động bất ngờ nào.");
-            empty.setForeground(UiUtil.TEXT_MUTED);
+            JLabel empty = new JLabel("Một ngày yên bình trôi qua, không có sự cố nào phát sinh.");
+            empty.setForeground(UiUtil.COLOR_MUTED);
             linesPanel.add(empty);
         } else {
             for (String line : report.lines()) {
@@ -93,20 +98,21 @@ public final class DaySummaryDialog {
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setPreferredSize(new Dimension(580, 210));
+        scroll.setPreferredSize(new Dimension(580, 220));
         scroll.getVerticalScrollBar().setUnitIncrement(14);
         activityCard.add(scroll, BorderLayout.CENTER);
 
-        // Footer Action Button
+        // Nút bấm tiếp tục
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setOpaque(false);
-        String nextBtnText = report.gameOver() ? "Xem kết quả chung cuộc >>" : ("Bắt đầu ngày " + (report.day() + 1) + " >>");
-        footer.add(UiUtil.button(nextBtnText, UiUtil.GOLD, dialog::dispose));
+        String nextBtnText = report.gameOver() ? "Xem kết quả chung cuộc »" : ("Bắt đầu ngày " + (report.day() + 1) + " »");
+        JButton nextBtn = UiUtil.button(nextBtnText, UiUtil.COLOR_OK, dialog::dispose);
+        footer.add(nextBtn);
 
-        // Root container
+        // Ghép vào khung root
         JPanel root = new JPanel(new BorderLayout(14, 14));
-        root.setBackground(UiUtil.NAVY_BG);
-        root.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
+        root.setBackground(UiUtil.COLOR_BG);
+        root.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
         root.add(header, BorderLayout.NORTH);
 
         JPanel center = new JPanel(new BorderLayout(12, 12));
@@ -123,17 +129,17 @@ public final class DaySummaryDialog {
         dialog.setVisible(true);
     }
 
-    private static JPanel createMetricCard(String label, String value, Color bg, Color border, Color textCol) {
-        JPanel card = UiUtil.card(bg, border);
-        card.setLayout(new GridLayout(2, 1, 2, 2));
-        card.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+    private static JPanel createMetricCard(String label, String value, Color textCol) {
+        JPanel card = UiUtil.card(UiUtil.COLOR_PANEL, UiUtil.COLOR_LINE);
+        card.setLayout(new GridLayout(2, 1, 4, 4));
+        card.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
 
         JLabel lbl = new JLabel(label, SwingConstants.CENTER);
-        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 12f));
-        lbl.setForeground(new Color(226, 232, 240));
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lbl.setForeground(UiUtil.COLOR_MUTED);
 
         JLabel val = new JLabel(value, SwingConstants.CENTER);
-        val.setFont(val.getFont().deriveFont(Font.BOLD, 15f));
+        val.setFont(new Font("Segoe UI", Font.BOLD, 17));
         val.setForeground(textCol);
 
         card.add(lbl);
@@ -141,37 +147,47 @@ public final class DaySummaryDialog {
         return card;
     }
 
+    /**
+     * Mỗi dòng sự kiện có icon tròn nhỏ màu theo loại:
+     * xanh lá = tốt, vàng = cảnh báo, đỏ = mất, xanh dương = thông tin.
+     */
     private static JPanel createEventRow(String line) {
-        String icon = "🔹";
+        Color dotColor = UiUtil.COLOR_ACCENT; // Mặc định xanh dương thông tin
         String lower = line.toLowerCase();
-        if (lower.contains("thuê") || lower.contains("trả xe") || lower.contains("tiền thuê")) {
-            icon = "🔑";
-        } else if (lower.contains("rửa xe") || lower.contains("sạch")) {
-            icon = "🫧";
-        } else if (lower.contains("sửa")) {
-            icon = "🔧";
-        } else if (lower.contains("phí bãi") || lower.contains("bãi xe")) {
-            icon = "🏢";
-        } else if (lower.contains("bỏ đi") || lower.contains("mất uy tín")) {
-            icon = "🚶";
-        } else if (lower.contains("bão") || lower.contains("trầy") || lower.contains("phạt")) {
-            icon = "⚠️";
-        } else if (lower.contains("trúng thưởng") || lower.contains("giới thiệu")) {
-            icon = "🎉";
+
+        if (lower.contains("bỏ đi") || lower.contains("mất uy tín") || lower.contains("phạt") || lower.contains("hỏng")) {
+            dotColor = UiUtil.COLOR_BAD; // Đỏ: mất mát, lỗi
+        } else if (lower.contains("bão") || lower.contains("trầy") || lower.contains("bẩn") || lower.contains("hao mòn")) {
+            dotColor = UiUtil.COLOR_WARN; // Vàng: cảnh báo
+        } else if (lower.contains("thuê") || lower.contains("trả xe") || lower.contains("tiền thuê")
+                || lower.contains("sạch") || lower.contains("trúng thưởng") || lower.contains("giới thiệu")) {
+            dotColor = UiUtil.COLOR_OK; // Xanh lá: tốt, thu nhập
         }
 
-        JPanel row = new JPanel(new BorderLayout(8, 0));
+        JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setOpaque(false);
         row.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(42, 60, 96, 120)),
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(48, 54, 61, 100)),
                 BorderFactory.createEmptyBorder(4, 4, 4, 4)));
 
-        JLabel iconLbl = new JLabel(icon);
-        iconLbl.setFont(iconLbl.getFont().deriveFont(14f));
+        final Color finalDot = dotColor;
+        JComponent dotComp = new JComponent() {
+            private static final long serialVersionUID = 1L;
+            @Override
+            protected void paintComponent(Graphics g0) {
+                Graphics2D g = (Graphics2D) g0.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(finalDot);
+                g.fillOval(4, (getHeight() - 8) / 2, 8, 8);
+                g.dispose();
+            }
+        };
+        dotComp.setPreferredSize(new Dimension(18, 18));
 
-        JLabel textLbl = new JLabel("<html><body style='color:#f1f5f9; font-size:12px; width:480px;'>" + line + "</body></html>");
+        JLabel textLbl = new JLabel("<html><body style='color:#e6edf3; font-family: Segoe UI, sans-serif; font-size:13px; width:480px;'>"
+                + line + "</body></html>");
 
-        row.add(iconLbl, BorderLayout.WEST);
+        row.add(dotComp, BorderLayout.WEST);
         row.add(textLbl, BorderLayout.CENTER);
         return row;
     }

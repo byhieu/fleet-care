@@ -20,18 +20,16 @@ import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
@@ -41,7 +39,10 @@ import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The game screen with dark navy & gold theme, tooltips, and real-time updates. */
+/**
+ * Màn hình chính của Car Tycoon theo chuẩn thiết kế GitHub Dark.
+ * Thanh trên chứa các ô thống kê tinh tế, 2 bảng giữa đối xứng, dải nút hành động nổi bật.
+ */
 public class MainWindow extends JFrame implements GameListener {
     private static final long serialVersionUID = 1L;
 
@@ -49,81 +50,111 @@ public class MainWindow extends JFrame implements GameListener {
     private final transient SaveManager saves;
     private final transient ScoreBoard scoreBoard;
 
-    private final JLabel dayLabel = topLabel();
-    private final JLabel moneyLabel = topLabel();
-    private final JLabel starsLabel = topLabel();
-    private final JLabel levelLabel = topLabel();
-    private final JProgressBar levelBar = new RoundedProgressBar(0, 100);
+    // Các thành phần thống kê thanh trên
+    private final JLabel dayTitle = new JLabel("NGÀY");
+    private final JLabel dayVal = new JLabel("1 / 30");
+
+    private final JLabel moneyTitle = new JLabel("TIỀN MẶT");
+    private final JLabel moneyVal = new JLabel("15.000.000 đ");
+
+    private final JLabel repTitle = new JLabel("UY TÍN");
+    private final JLabel repVal = new JLabel();
+
+    private final JLabel levelTitle = new JLabel("CẤP 1");
+    private final JLabel levelVal = new JLabel("Khởi nghiệp");
+
+    private final JLabel progressTitle = new JLabel("LÊN CẤP 2 · 0/15 TR");
+    private final TopProgressBar progressBar = new TopProgressBar();
+
     private final CustomerPanel customerPanel = new CustomerPanel();
     private final GaragePanel garagePanel = new GaragePanel();
-    private final JTextArea logArea = new JTextArea(6, 80);
+    private final JTextArea logArea = new JTextArea(5, 80);
 
     public MainWindow(GameEngine engine, SaveManager saves, ScoreBoard scoreBoard) {
         super("Car Tycoon - Ông trùm cho thuê xe");
         this.engine = engine;
         this.saves = saves;
         this.scoreBoard = scoreBoard;
-        getContentPane().setBackground(UiUtil.NAVY_BG);
+        getContentPane().setBackground(UiUtil.COLOR_BG);
 
-        // Top Header Bar
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 10));
-        top.setBackground(UiUtil.NAVY_DARKEST);
-        top.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, UiUtil.GOLD));
+        // =====================================================================
+        // 1. THANH TRÊN: Khung bo góc 10px, nền PANEL, viền LINE
+        // =====================================================================
+        JPanel topCard = UiUtil.card(UiUtil.COLOR_PANEL, UiUtil.COLOR_LINE);
+        topCard.setLayout(new BorderLayout(16, 0));
+        topCard.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
 
-        levelBar.setStringPainted(true);
-        levelBar.setPreferredSize(new Dimension(180, 24));
-        levelBar.setToolTipText("Tiến độ doanh thu cần đạt để nâng cấp showroom");
+        // Nhóm các ô thống kê bên trái
+        JPanel statsLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 24, 0));
+        statsLeft.setOpaque(false);
 
-        dayLabel.setToolTipText("Thời gian kinh doanh hiện tại (Tối đa 30 ngày)");
-        moneyLabel.setToolTipText("Tiền mặt hiện có. CẢNH BÁO: Âm tiền cuối ngày sẽ phá sản!");
-        starsLabel.setToolTipText("Điểm uy tín cửa hàng (Tăng nhờ xe sạch và bảo dưỡng tốt)");
-        levelLabel.setToolTipText("Cấp độ kinh doanh hiện tại của bạn");
+        dayVal.setFont(UiUtil.FONT_TITLE_LARGE);
+        dayVal.setForeground(UiUtil.COLOR_TEXT);
+        statsLeft.add(createStatBox(dayTitle, dayVal));
 
-        top.add(dayLabel);
-        top.add(moneyLabel);
-        top.add(starsLabel);
-        top.add(levelLabel);
-        top.add(levelBar);
+        moneyVal.setFont(UiUtil.FONT_TITLE_LARGE);
+        moneyVal.setForeground(UiUtil.COLOR_OK);
+        statsLeft.add(createStatBox(moneyTitle, moneyVal));
 
-        JButton achBtn = UiUtil.button("🎖️ Thành tích", null, this::showAchievements);
-        achBtn.setToolTipText("Xem danh sách thành tích đã đạt và chưa đạt");
-        JButton saveBtn = UiUtil.button("💾 Lưu game", null, () -> UiUtil.run(this, this::saveGameManual));
-        saveBtn.setToolTipText("Lưu lại tiến trình ván chơi vào máy");
-        JButton homeBtn = UiUtil.button("🏠 Màn hình chính", null, this::backToStart);
-        homeBtn.setToolTipText("Lưu game và quay lại màn hình khởi đầu");
+        repVal.setFont(UiUtil.FONT_TITLE_LARGE);
+        repVal.setForeground(UiUtil.COLOR_TEXT);
+        statsLeft.add(createStatBox(repTitle, repVal));
 
-        top.add(achBtn);
-        top.add(saveBtn);
-        top.add(homeBtn);
+        levelVal.setFont(UiUtil.FONT_TITLE_LARGE);
+        levelVal.setForeground(UiUtil.COLOR_TEXT);
+        statsLeft.add(createStatBox(levelTitle, levelVal));
 
-        // Center Split Pane
+        // Ô tiến độ lên cấp
+        JPanel progressBox = new JPanel(new BorderLayout(0, 8));
+        progressBox.setOpaque(false);
+        progressTitle.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        progressTitle.setForeground(UiUtil.COLOR_MUTED);
+        progressBox.add(progressTitle, BorderLayout.NORTH);
+        progressBox.add(progressBar, BorderLayout.CENTER);
+        statsLeft.add(progressBox);
+
+        // 3 nút điều khiển bên phải
+        JPanel buttonsRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 6));
+        buttonsRight.setOpaque(false);
+
+        JButton achBtn = UiUtil.button("Thành tích", null, this::showAchievements);
+        JButton saveBtn = UiUtil.button("Lưu game", null, () -> UiUtil.run(this, this::saveGameManual));
+        JButton homeBtn = UiUtil.button("Màn hình chính", null, this::backToStart);
+
+        buttonsRight.add(achBtn);
+        buttonsRight.add(saveBtn);
+        buttonsRight.add(homeBtn);
+
+        topCard.add(statsLeft, BorderLayout.CENTER);
+        topCard.add(buttonsRight, BorderLayout.EAST);
+
+        // =====================================================================
+        // 2. GIỮA: 2 KHUNG "KHÁCH HÔM NAY" VÀ "GARAGE CỦA TÔI"
+        // =====================================================================
         customerPanel.onSelect(garagePanel::setCustomer);
-        JSplitPane center = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, customerPanel, garagePanel);
-        center.setDividerLocation(520);
-        center.setBackground(UiUtil.NAVY_DARKEST);
-        center.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
 
-        // Bottom Actions Bar
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 10));
+        JSplitPane centerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, customerPanel, garagePanel);
+        centerSplit.setUI(new UiUtil.GitHubSplitPaneUI());
+        centerSplit.setDividerSize(8);
+        centerSplit.setContinuousLayout(true);
+        centerSplit.setResizeWeight(0.45);
+        centerSplit.setDividerLocation(660);
+        centerSplit.setOpaque(false);
+        centerSplit.setBackground(UiUtil.COLOR_BG);
+        centerSplit.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+        // =====================================================================
+        // 3. DẢI NÚT HÀNH ĐỘNG CĂN GIỮA
+        // =====================================================================
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 8));
         actions.setOpaque(false);
 
-        JButton rentBtn = UiUtil.button("🔑 Cho thuê →", UiUtil.GREEN, () -> act(() -> engine.rent(customerPanel.getSelected(), garagePanel.getSelected())));
-        rentBtn.setToolTipText("Cho khách được chọn thuê xe được chọn (Khách thanh toán tiền ngay)");
-
-        JButton washBtn = UiUtil.button("🫧 Rửa xe (100.000 đ)", null, () -> act(() -> engine.wash(garagePanel.getSelected())));
-        washBtn.setToolTipText("Rửa sạch xe đang bẩn để khách hài lòng và gia tăng uy tín");
-
-        JButton repairBtn = UiUtil.button("🔧 Sửa xe", null, this::repair);
-        repairBtn.setToolTipText("Sửa chữa xe đã chọn phục hồi tình trạng máy móc về 100%");
-
-        JButton sellBtn = UiUtil.button("🏷️ Bán xe", null, this::sell);
-        sellBtn.setToolTipText("Thanh lý xe đã chọn để thu hồi tiền mặt");
-
-        JButton shopBtn = UiUtil.button("🏬 Cửa hàng xe", UiUtil.BLUE, () -> new ShopDialog(this, engine).setVisible(true));
-        shopBtn.setToolTipText("Mở showroom để mua thêm các dòng xe mới bổ sung vào garage");
-
-        JButton nextDayBtn = UiUtil.button("🌅 Ngày tiếp theo >>", UiUtil.GOLD, this::nextDay);
-        nextDayBtn.setToolTipText("Kết thúc ngày, nhận xe khách trả, tính phí bãi và đón khách mới");
+        JButton rentBtn = UiUtil.button("Cho thuê →", UiUtil.COLOR_OK, () -> act(() -> engine.rent(customerPanel.getSelected(), garagePanel.getSelected())));
+        JButton washBtn = UiUtil.button("Rửa xe · 100.000 đ", null, () -> act(() -> engine.wash(garagePanel.getSelected())));
+        JButton repairBtn = UiUtil.button("Sửa xe", null, this::repair);
+        JButton sellBtn = UiUtil.button("Bán xe", null, this::sell);
+        JButton shopBtn = UiUtil.button("Cửa hàng xe", null, () -> new ShopDialog(this, engine).setVisible(true));
+        JButton nextDayBtn = UiUtil.button("Ngày tiếp theo »", UiUtil.COLOR_OK, this::nextDay);
 
         actions.add(rentBtn);
         actions.add(washBtn);
@@ -132,48 +163,75 @@ public class MainWindow extends JFrame implements GameListener {
         actions.add(shopBtn);
         actions.add(nextDayBtn);
 
-        // Bottom Log Area
+        // =====================================================================
+        // 4. DƯỚI CÙNG: KHUNG "NHẬT KÝ HOẠT ĐỘNG"
+        // =====================================================================
         logArea.setEditable(false);
-        logArea.setBackground(UiUtil.NAVY_DARKEST);
-        logArea.setForeground(UiUtil.TEXT_PRIMARY);
-        logArea.setCaretColor(UiUtil.GOLD);
-        logArea.setFont(new Font("Consolas", Font.PLAIN, 13));
+        logArea.setBackground(UiUtil.COLOR_PANEL);
+        logArea.setForeground(UiUtil.COLOR_MUTED);
+        logArea.setCaretColor(UiUtil.COLOR_ACCENT);
+        logArea.setFont(UiUtil.FONT_MONO);
         logArea.setLineWrap(true);
-        logArea.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        logArea.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
         JScrollPane logScroll = new JScrollPane(logArea);
-        logScroll.getViewport().setBackground(UiUtil.NAVY_DARKEST);
-        logScroll.setBorder(BorderFactory.createLineBorder(UiUtil.NAVY_BORDER, 1));
+        UiUtil.styleScrollPane(logScroll);
+        logScroll.getViewport().setBackground(UiUtil.COLOR_PANEL);
 
-        JPanel bottom = new JPanel(new BorderLayout(4, 4));
-        bottom.setOpaque(false);
-        bottom.setBorder(BorderFactory.createEmptyBorder(0, 6, 6, 6));
-        bottom.add(actions, BorderLayout.NORTH);
-        bottom.add(UiUtil.titled("Nhật ký hoạt động", logScroll), BorderLayout.CENTER);
+        JPanel logCard = UiUtil.createSectionCard("NHẬT KÝ HOẠT ĐỘNG", null, logScroll);
+        logCard.setPreferredSize(new Dimension(logCard.getPreferredSize().width, 130));
 
-        getContentPane().add(top, BorderLayout.NORTH);
-        getContentPane().add(center, BorderLayout.CENTER);
-        getContentPane().add(bottom, BorderLayout.SOUTH);
+        JPanel bottomPanel = new JPanel(new BorderLayout(0, 6));
+        bottomPanel.setOpaque(false);
+        bottomPanel.add(actions, BorderLayout.NORTH);
+        bottomPanel.add(logCard, BorderLayout.CENTER);
+
+        // Bọc toàn bộ vào root panel có padding viền
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(UiUtil.COLOR_BG);
+        root.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
+        root.add(topCard, BorderLayout.NORTH);
+        root.add(centerSplit, BorderLayout.CENTER);
+        root.add(bottomPanel, BorderLayout.SOUTH);
+
+        setContentPane(root);
 
         engine.addListener(this);
         onGameChanged(engine.getState());
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
+            public void windowOpened(WindowEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    int w = centerSplit.getWidth();
+                    if (w > 0) {
+                        centerSplit.setDividerLocation((int) (w * 0.45));
+                    } else {
+                        centerSplit.setDividerLocation(660);
+                    }
+                });
+            }
+
+            @Override
             public void windowClosing(WindowEvent e) {
                 if (!engine.getState().isGameOver()) UiUtil.run(MainWindow.this, MainWindow.this::saveGame);
                 System.exit(0);
             }
         });
-        setSize(1360, 800);
+        setSize(1500, 860);
+        setMinimumSize(new Dimension(1200, 720));
         setLocationRelativeTo(null);
     }
 
-    private static JLabel topLabel() {
-        JLabel label = new JLabel();
-        label.setForeground(Color.WHITE);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 16f));
-        return label;
+    private static JPanel createStatBox(JLabel title, JLabel val) {
+        JPanel p = new JPanel(new BorderLayout(0, 4));
+        p.setOpaque(false);
+        val.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 8));
+        title.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        title.setForeground(UiUtil.COLOR_MUTED);
+        p.add(title, BorderLayout.NORTH);
+        p.add(val, BorderLayout.CENTER);
+        return p;
     }
 
     private void act(Runnable action) {
@@ -189,26 +247,36 @@ public class MainWindow extends JFrame implements GameListener {
 
     @Override
     public void onGameChanged(GameState s) {
-        dayLabel.setText("📅 Ngày " + s.getDay() + "/" + GameEngine.LAST_DAY);
-        moneyLabel.setText("💰 " + Format.money(s.getMoney()));
-        moneyLabel.setForeground(s.getMoney() < 1_000_000 ? new Color(248, 113, 113) : new Color(74, 222, 128));
-        starsLabel.setText("⭐ " + UiUtil.stars(s.getStars()) + " (" + s.getReputation() + ")");
+        dayVal.setText(s.getDay() + " / " + GameEngine.LAST_DAY);
+        moneyVal.setText(Format.money(s.getMoney()));
+        moneyVal.setForeground(s.getMoney() < 1_000_000 ? UiUtil.COLOR_BAD : UiUtil.COLOR_OK);
+
+        // Hiển thị sao màu WARN và điểm uy tín màu TEXT
+        repVal.setText("<html><span style='color:#d29922; font-family: Segoe UI Symbol, Dialog, sans-serif; font-size: 16px;'>"
+                + UiUtil.stars(s.getStars()) + "</span> <span style='color:#e6edf3; font-family: Segoe UI, sans-serif; font-size: 18px; font-weight: bold;'>"
+                + s.getReputation() + "</span></html>");
+
         Level level = s.getLevel();
-        levelLabel.setText("🏆 Cấp " + level.getNumber() + ": " + level.getTitle());
+        levelTitle.setText("CẤP " + level.getNumber());
+        levelVal.setText(level.getTitle());
+
         Level next = level.next();
         if (next == null) {
-            levelBar.setValue(100);
-            levelBar.setString("Cấp cao nhất!");
+            progressBar.setValue(100);
+            progressTitle.setText("CẤP CAO NHẤT");
         } else {
             long from = level.getRevenueNeeded();
             long done = s.getTotalRevenue() - from;
             long need = next.getRevenueNeeded() - from;
-            levelBar.setValue((int) (done * 100 / need));
-            levelBar.setString("Lên cấp: " + done / 1_000_000 + "/" + need / 1_000_000 + " tr");
+            int pct = (int) Math.max(0, Math.min(100, (done * 100 / need)));
+            progressBar.setValue(pct);
+            progressTitle.setText("LÊN CẤP " + next.getNumber() + " · " + (done / 1_000_000) + "/" + (need / 1_000_000) + " TR");
         }
+
         customerPanel.refresh(s);
         garagePanel.refresh(s);
         garagePanel.setCustomer(customerPanel.getSelected());
+
         List<String> log = s.getLog();
         logArea.setText(String.join("\n", log.subList(Math.max(0, log.size() - 200), log.size())));
         logArea.setCaretPosition(logArea.getDocument().getLength());
@@ -273,29 +341,28 @@ public class MainWindow extends JFrame implements GameListener {
 
     private void showAchievements() {
         JDialog dialog = new JDialog(this, "Thành tích người chơi", true);
-        dialog.getContentPane().setBackground(UiUtil.NAVY_BG);
+        dialog.getContentPane().setBackground(UiUtil.COLOR_BG);
 
-        JLabel title = new JLabel("🎖️ DANH HIỆU & THÀNH TÍCH", SwingConstants.CENTER);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 20f));
-        title.setForeground(UiUtil.GOLD);
+        JLabel title = new JLabel("DANH HIỆU & THÀNH TÍCH", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(UiUtil.COLOR_TEXT);
 
         JPanel listPanel = new JPanel(new GridLayout(0, 1, 8, 8));
         listPanel.setOpaque(false);
 
         for (Achievement a : Achievement.values()) {
             boolean done = engine.getState().getAchievements().contains(a);
-            JPanel card = UiUtil.card(done ? new Color(20, 50, 32) : UiUtil.NAVY_CARD,
-                    done ? new Color(34, 197, 94) : UiUtil.NAVY_BORDER);
-            card.setLayout(new BorderLayout(6, 4));
-            card.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+            JPanel card = UiUtil.card(UiUtil.COLOR_PANEL, done ? UiUtil.COLOR_OK : UiUtil.COLOR_LINE);
+            card.setLayout(new BorderLayout(8, 4));
+            card.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
 
             JLabel name = new JLabel((done ? "✔ [ĐÃ ĐẠT] " : "🔒 [CHƯA] ") + a.getTitle());
-            name.setFont(name.getFont().deriveFont(Font.BOLD, 13f));
-            name.setForeground(done ? new Color(110, 231, 145) : UiUtil.TEXT_MUTED);
+            name.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            name.setForeground(done ? UiUtil.COLOR_OK : UiUtil.COLOR_MUTED);
 
             JLabel desc = new JLabel(a.getDescription());
-            desc.setFont(desc.getFont().deriveFont(12f));
-            desc.setForeground(UiUtil.TEXT_PRIMARY);
+            desc.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            desc.setForeground(UiUtil.COLOR_TEXT);
 
             card.add(name, BorderLayout.NORTH);
             card.add(desc, BorderLayout.CENTER);
@@ -305,17 +372,17 @@ public class MainWindow extends JFrame implements GameListener {
         JScrollPane scroll = new JScrollPane(listPanel);
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
-        scroll.setBorder(BorderFactory.createLineBorder(UiUtil.NAVY_BORDER, 1));
+        scroll.setBorder(BorderFactory.createLineBorder(UiUtil.COLOR_LINE, 1));
         scroll.setPreferredSize(new Dimension(520, 360));
         scroll.getVerticalScrollBar().setUnitIncrement(14);
 
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setOpaque(false);
-        footer.add(UiUtil.button("Đóng", UiUtil.GOLD, dialog::dispose));
+        footer.add(UiUtil.button("Đóng", null, dialog::dispose));
 
-        JPanel root = new JPanel(new BorderLayout(10, 10));
-        root.setBackground(UiUtil.NAVY_BG);
-        root.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
+        JPanel root = new JPanel(new BorderLayout(12, 12));
+        root.setBackground(UiUtil.COLOR_BG);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
         root.add(title, BorderLayout.NORTH);
         root.add(scroll, BorderLayout.CENTER);
         root.add(footer, BorderLayout.SOUTH);
@@ -332,57 +399,40 @@ public class MainWindow extends JFrame implements GameListener {
         new StartWindow(saves, scoreBoard).setVisible(true);
     }
 
-    /** Sleek rounded progress bar with dark track and gold fill. */
-    private static class RoundedProgressBar extends JProgressBar {
+    /** Thanh tiến độ lên cấp cao 8px bo tròn màu ACCENT */
+    private static class TopProgressBar extends JComponent {
         private static final long serialVersionUID = 1L;
+        private int value = 0;
 
-        RoundedProgressBar(int min, int max) {
-            super(min, max);
+        TopProgressBar() {
+            setPreferredSize(new Dimension(180, 8));
+            setMinimumSize(new Dimension(150, 8));
             setOpaque(false);
-            setBorderPainted(false);
+        }
+
+        public void setValue(int v) {
+            this.value = Math.max(0, Math.min(100, v));
+            repaint();
         }
 
         @Override
         protected void paintComponent(Graphics g0) {
             Graphics2D g = (Graphics2D) g0.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
             int w = getWidth();
             int h = getHeight();
             int arc = h;
 
-            // Track background
-            g.setColor(new Color(25, 36, 60));
+            // Track nền tối
+            g.setColor(new Color(33, 38, 45));
             g.fillRoundRect(0, 0, w, h, arc, arc);
 
-            // Fill
-            double pct = (double) (getValue() - getMinimum()) / Math.max(1, (getMaximum() - getMinimum()));
-            int fillW = (int) Math.round(w * Math.max(0, Math.min(1.0, pct)));
+            // Tiến độ màu ACCENT
+            int fillW = (int) Math.round(w * (value / 100.0));
             if (fillW > 0) {
-                g.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, w, h, arc, arc));
-                g.setPaint(new GradientPaint(0, 0, new Color(234, 179, 8), w, 0, new Color(250, 204, 21)));
+                g.setColor(UiUtil.COLOR_ACCENT);
                 g.fillRoundRect(0, 0, Math.max(fillW, arc), h, arc, arc);
-                g.setClip(null);
-            }
-
-            // Border
-            g.setColor(new Color(42, 60, 96));
-            g.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
-
-            // String
-            String str = getString();
-            if (str != null && !str.isEmpty()) {
-                Font font = getFont().deriveFont(Font.BOLD, 12f);
-                g.setFont(font);
-                FontMetrics fm = g.getFontMetrics();
-                int tx = (w - fm.stringWidth(str)) / 2;
-                int ty = (h + fm.getAscent() - fm.getDescent()) / 2;
-
-                g.setColor(new Color(11, 19, 43, 220));
-                g.drawString(str, tx + 1, ty + 1);
-                g.setColor(Color.WHITE);
-                g.drawString(str, tx, ty);
             }
             g.dispose();
         }

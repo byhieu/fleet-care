@@ -8,13 +8,13 @@ import com.cartycoon.model.Level;
 import com.cartycoon.util.Format;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -22,7 +22,10 @@ import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.Font;
 
-/** The car shop with dark navy & gold styling, icons, and tooltips. */
+/**
+ * Cửa hàng xe theo phong cách GitHub Dark.
+ * Bảng thông tin xe rõ ràng, hàng khóa làm mờ nhẹ, nút mua màu xanh lá.
+ */
 public class ShopDialog extends JDialog {
     private static final long serialVersionUID = 1L;
 
@@ -34,54 +37,67 @@ public class ShopDialog extends JDialog {
     public ShopDialog(JFrame owner, GameEngine engine) {
         super(owner, "Cửa hàng xe", true);
         this.engine = engine;
-        getContentPane().setBackground(UiUtil.NAVY_BG);
+        getContentPane().setBackground(UiUtil.COLOR_BG);
         Level level = engine.getState().getLevel();
 
-        model.column("Xe", o -> UiUtil.getCarIcon(o.preview().getTypeName()) + " " + o.model())
+        model.column("Xe", CarOffer::model)
                 .column("Loại", o -> o.preview().getTypeName())
-                .column("Chỗ", o -> o.preview().getSeats())
+                .column("Chỗ", o -> o.preview().getSeats() + " chỗ")
                 .column("Giá mua", o -> Format.money(o.preview().getBuyPrice()))
                 .column("Cho thuê/ngày", o -> Format.money(o.preview().getDailyPrice()))
                 .column("Hao mòn/ngày", o -> o.preview().getWearPerDay() + "%")
-                .column("Mở khóa", o -> o.isUnlocked(level) ? "✔ Có thể mua" : "🔒 Cấp " + o.minLevel());
+                .column("Mở khóa", o -> o.isUnlocked(level) ? "Có thể mua" : "Cấp " + o.minLevel());
 
         model.setRows(CarCatalog.OFFERS);
-        table.setDefaultRenderer(Object.class, new LockedRenderer(level));
 
-        int[] widths = {140, 110, 50, 110, 120, 100, 120};
+        // Renderers cho các cột
+        table.getColumnModel().getColumn(0).setCellRenderer(new ShopCellRenderer(level, 0));
+        table.getColumnModel().getColumn(1).setCellRenderer(new ShopCellRenderer(level, 1));
+        table.getColumnModel().getColumn(2).setCellRenderer(new ShopCellRenderer(level, 2));
+        table.getColumnModel().getColumn(3).setCellRenderer(new ShopCellRenderer(level, 3));
+        table.getColumnModel().getColumn(4).setCellRenderer(new ShopCellRenderer(level, 4));
+        table.getColumnModel().getColumn(5).setCellRenderer(new ShopCellRenderer(level, 5));
+        table.getColumnModel().getColumn(6).setCellRenderer(new ShopCellRenderer(level, 6));
+
+        int[] widths = {140, 110, 65, 120, 125, 95, 110};
         for (int i = 0; i < widths.length && i < table.getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
         }
 
-        // Rich Tooltips for shop offers
         table.setToolTipProvider(this::shopOfferToolTip);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
         buttons.setOpaque(false);
-        moneyLabel.setForeground(UiUtil.GOLD);
-        moneyLabel.setFont(moneyLabel.getFont().deriveFont(Font.BOLD, 14f));
-        buttons.add(moneyLabel);
-        buttons.add(UiUtil.button("Mua xe này", UiUtil.GREEN, this::buy));
-        buttons.add(UiUtil.button("Đóng", null, this::dispose));
 
-        JLabel hint = new JLabel("💡 Mẹo: Xe đắt cho thuê được giá cao hơn, nhưng chi phí bảo dưỡng và sửa chữa cũng khác nhau.");
-        hint.setForeground(UiUtil.TEXT_MUTED);
-        hint.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        moneyLabel.setForeground(UiUtil.COLOR_OK);
+        moneyLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        buttons.add(moneyLabel);
+
+        JButton buyBtn = UiUtil.button("Mua xe này", UiUtil.COLOR_OK, this::buy);
+        JButton closeBtn = UiUtil.button("Đóng", null, this::dispose);
+        buttons.add(buyBtn);
+        buttons.add(closeBtn);
+
+        JLabel hint = new JLabel("Mẹo: Xe đắt tiền cho thuê được giá cao hơn nhưng chi phí bảo dưỡng và sửa chữa cũng tương ứng.");
+        hint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        hint.setForeground(UiUtil.COLOR_MUTED);
+        hint.setBorder(BorderFactory.createEmptyBorder(6, 10, 10, 10));
 
         JScrollPane scroll = new JScrollPane(table);
-        scroll.getViewport().setBackground(UiUtil.NAVY_BG);
-        scroll.setBorder(BorderFactory.createLineBorder(UiUtil.NAVY_BORDER, 1));
+        UiUtil.styleScrollPane(scroll);
+        scroll.getViewport().setBackground(UiUtil.COLOR_PANEL);
+        scroll.setBorder(BorderFactory.createLineBorder(UiUtil.COLOR_LINE, 1));
 
         JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(UiUtil.NAVY_BG);
-        root.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+        root.setBackground(UiUtil.COLOR_BG);
+        root.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
         root.add(hint, BorderLayout.NORTH);
         root.add(scroll, BorderLayout.CENTER);
         root.add(buttons, BorderLayout.SOUTH);
 
         setContentPane(root);
         updateMoney();
-        setSize(860, 420);
+        setSize(880, 440);
         setLocationRelativeTo(owner);
     }
 
@@ -94,27 +110,18 @@ public class ShopDialog extends JDialog {
         boolean unlocked = offer.isUnlocked(engine.getState().getLevel());
         boolean canAfford = engine.getState().getMoney() >= preview.getBuyPrice();
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("<html><body style='width: 300px; padding: 4px; font-family: Segoe UI, sans-serif;'>");
-        sb.append("<b style='color: #fde047; font-size: 13px;'>")
-                .append(UiUtil.getCarIcon(preview.getTypeName())).append(" ")
-                .append(offer.model()).append(" (").append(preview.getTypeName()).append(")</b><br/>");
-        sb.append("<hr style='border: 0; border-top: 1px solid #2a3c60; margin: 4px 0;'/>");
-        sb.append("<b>💵 Giá mua:</b> ").append(Format.money(preview.getBuyPrice())).append("<br/>");
-        sb.append("<b>💰 Thu nhập cho thuê:</b> ").append(Format.money(preview.getDailyPrice())).append("/ngày<br/>");
-        sb.append("<b>📉 Hao mòn mỗi ngày thuê:</b> ").append(preview.getWearPerDay()).append("%<br/>");
-        sb.append("<b>👥 Số chỗ ngồi:</b> ").append(preview.getSeats()).append(" chỗ<br/>");
-        sb.append("<hr style='border: 0; border-top: 1px solid #2a3c60; margin: 4px 0;'/>");
-        if (!unlocked) {
-            sb.append("<span style='color:#f87171;'>🔒 Yêu cầu Cửa hàng đạt Cấp ").append(offer.minLevel()).append(" để mở khóa.</span>");
-        } else if (!canAfford) {
-            sb.append("<span style='color:#facc15;'>⚠️ Bạn chưa đủ tiền mua (cần thêm ")
-                    .append(Format.money(preview.getBuyPrice() - engine.getState().getMoney())).append(").</span>");
-        } else {
-            sb.append("<span style='color:#4ade80;'>✔ Đủ điều kiện mua ngay!</span>");
-        }
-        sb.append("</body></html>");
-        return sb.toString();
+        return "<html><body style='width: 290px; padding: 4px; font-family: Segoe UI, sans-serif; color: #e6edf3;'>"
+                + "<b style='color: #2f81f7; font-size: 13px;'>" + offer.model() + " (" + preview.getTypeName() + ")</b><br/>"
+                + "<hr style='border: 0; border-top: 1px solid #30363d; margin: 4px 0;'/>"
+                + "<span style='color:#7d8590;'>Giá mua:</span> " + Format.money(preview.getBuyPrice()) + "<br/>"
+                + "<span style='color:#7d8590;'>Thu nhập cho thuê:</span> " + Format.money(preview.getDailyPrice()) + "/ngày<br/>"
+                + "<span style='color:#7d8590;'>Hao mòn mỗi ngày:</span> " + preview.getWearPerDay() + "%<br/>"
+                + "<span style='color:#7d8590;'>Số chỗ ngồi:</span> " + preview.getSeats() + " chỗ<br/>"
+                + "<hr style='border: 0; border-top: 1px solid #30363d; margin: 4px 0;'/>"
+                + (!unlocked ? "<span style='color:#f85149;'>Yêu cầu Cửa hàng đạt Cấp " + offer.minLevel() + " để mở khóa.</span>"
+                : (!canAfford ? "<span style='color:#d29922;'>Bạn chưa đủ tiền (cần thêm " + Format.money(preview.getBuyPrice() - engine.getState().getMoney()) + ").</span>"
+                : "<span style='color:#3fb950; font-weight:bold;'>Đủ điều kiện mua ngay!</span>"))
+                + "</body></html>";
     }
 
     private void buy() {
@@ -135,44 +142,47 @@ public class ShopDialog extends JDialog {
         moneyLabel.setText("Tiền của bạn: " + Format.money(engine.getState().getMoney()) + "   ");
     }
 
-    /** Themed renderer for locked and unlocked cars in dark navy palette. */
-    private static class LockedRenderer extends DefaultTableCellRenderer {
+    /** Renderer riêng cho ShopDialog tuân thủ bảng màu GitHub Dark */
+    private static class ShopCellRenderer extends DefaultTableCellRenderer {
         private static final long serialVersionUID = 1L;
         private final Level level;
+        private final int colIndex;
+        private final UiUtil.PillRenderer pill = new UiUtil.PillRenderer();
 
-        LockedRenderer(Level level) {
+        ShopCellRenderer(Level level, int colIndex) {
             this.level = level;
+            this.colIndex = colIndex;
         }
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean selected, boolean focus, int row, int col) {
-            JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, selected, focus, row, col);
             CarOffer offer = ((ListTableModel<?>) table.getModel()).getRow(row) instanceof CarOffer o ? o : null;
             boolean unlocked = offer != null && offer.isUnlocked(level);
 
+            if (colIndex == 1 || colIndex == 6) {
+                return pill.getTableCellRendererComponent(table, value, selected, focus, row, col);
+            }
+
+            JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, selected, focus, row, col);
+            label.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 14));
+
             if (selected) {
-                label.setBackground(UiUtil.NAVY_SELECTED);
-                label.setForeground(Color.WHITE);
+                label.setBackground(UiUtil.ROW_SELECTED_BG);
+                label.setForeground(UiUtil.COLOR_TEXT);
                 return label;
             }
 
-            Color altBg = (row % 2 == 0) ? UiUtil.NAVY_BG : UiUtil.NAVY_PANEL_ALT;
+            Color cellBg = (row % 2 == 0) ? UiUtil.ROW_EVEN_BG : UiUtil.COLOR_PANEL;
+            label.setBackground(cellBg);
+
             if (unlocked) {
-                label.setBackground(altBg);
-                if (col == 3 || col == 4) {
-                    label.setForeground(UiUtil.TEXT_GOLD);
-                } else if (col == 6) {
-                    label.setForeground(UiUtil.STATUS_GREEN_TEXT);
-                } else {
-                    label.setForeground(UiUtil.TEXT_PRIMARY);
-                }
+                label.setForeground(colIndex == 0 ? UiUtil.COLOR_TEXT : (colIndex == 3 || colIndex == 4 ? UiUtil.COLOR_OK : UiUtil.COLOR_TEXT));
+                label.setFont(colIndex == 0 ? UiUtil.FONT_BODY_BOLD : UiUtil.FONT_BODY);
             } else {
-                label.setBackground(new Color(11, 16, 30));
-                label.setForeground(new Color(100, 116, 139));
-                if (col == 6) {
-                    label.setForeground(new Color(248, 113, 113));
-                }
+                label.setForeground(UiUtil.COLOR_MUTED);
+                label.setFont(UiUtil.FONT_BODY);
             }
+
             return label;
         }
     }
